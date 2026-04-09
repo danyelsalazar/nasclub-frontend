@@ -106,7 +106,7 @@ const RegisterForm = () => {
       setShowModal(true);
       navigate("/login");
     } catch (err) {
-      setModalMessage("Email already exists");
+      setModalMessage(err.response?.data?.msg || "Email already exists");
       setShowModal(true);
     }
   };
