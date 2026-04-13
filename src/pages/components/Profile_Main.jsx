@@ -21,11 +21,11 @@ const Profile = () => {
   const [faq, setFaq] = useState(1);
 
   const saveAccount = async () => {
-    setFormdata({ ...formdata, _id: decoded.id });
-    if (!formdata.phoneNumber || !formdata.password) {
+    if (!formdata.phoneNumber) {
       toast.error("Please fill all the inputs");
     } else {
-      await axios.post("/api/v1/registeragain", formdata);
+      const dataToSend = { ...formdata, _id: decoded.id };
+      await axios.post("/api/v1/registeragain", dataToSend);
       toast.success("Registration successful");
     }
   };

@@ -27,7 +27,14 @@ const TopNavbar = () => {
   const [notification, setNotification] = useState(false);
   const [flagItem, setFlagItem] = useState(false);
   const [selectedItem, setSelectedItem] = useState({});
-  const [pending, setPending] = useState([]); // Define 'pending'
+  const [pending, setPending] = useState([]);
+  const [darkMode, setDarkMode] = useState(() => localStorage.getItem("darkMode") === "true");
+
+  useEffect(() => {
+    document.body.classList.toggle("dark-mode", darkMode);
+    localStorage.setItem("darkMode", darkMode);
+  }, [darkMode]);
+
   const location = useLocation();
   const pathname = location.pathname; // This line was missing proper initialization
   const navigate = useNavigate(); // Move outside conditional block
@@ -81,7 +88,7 @@ const TopNavbar = () => {
     try {
       const updatedItem = { ...selectedItem, Type: "success" };
       await axios.put("/api/v1/getpending", updatedItem);
-      setPending((prev) => prev.filter((item) => item.id !== selectedItem.id)); // Update pending state
+      setPending((prev) => prev.filter((item) => item._id !== selectedItem._id));
       setFlagItem(false);
       toast.success("Permission accepted successfully", { autoClose: 300 });
     } catch (error) {
@@ -93,7 +100,7 @@ const TopNavbar = () => {
     try {
       const updatedItem = { ...selectedItem, Type: "failed" };
       await axios.put("/api/v1/getpending", updatedItem);
-      setPending((prev) => prev.filter((item) => item.id !== selectedItem.id)); // Update pending state
+      setPending((prev) => prev.filter((item) => item._id !== selectedItem._id));
       setFlagItem(false);
       toast.success("Permission denied successfully", { autoClose: 300 });
     } catch (error) {
@@ -177,9 +184,9 @@ const TopNavbar = () => {
             Dashboard
           </span>
         </Nav.Link>
-        <Nav.Link className="d-flex align-items-center">
+        <Nav.Link onClick={() => navigate("/market")} className="d-flex align-items-center">
           <FaChartLine />
-          <span className="ms-2">Market</span>
+          <span className={"ms-2 " + (pathname === "/market" ? "text-primary" : "")}>Market</span>
         </Nav.Link>
         <Nav.Link onClick={() => navigate("/portfolio")} className="d-flex align-items-center">
           <FaBriefcase />
@@ -187,9 +194,9 @@ const TopNavbar = () => {
             Portfolio
           </span>
         </Nav.Link>
-        <Nav.Link className="d-flex align-items-center">
+        <Nav.Link onClick={() => navigate("/position")} className="d-flex align-items-center">
           <FaBalanceScale />
-          <span className="ms-2">Position</span>
+          <span className={"ms-2 " + (pathname === "/position" ? "text-primary" : "")}>Position</span>
         </Nav.Link>
         <Nav.Link onClick={() => navigate("/order")} className="d-flex align-items-center">
           <FaShoppingCart />
@@ -263,6 +270,11 @@ const TopNavbar = () => {
             )}
           </Nav.Link>
         )}
+
+        {/* Dark Mode Toggle */}
+        <Nav.Link onClick={() => setDarkMode(!darkMode)} title={darkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}>
+          <span style={{ fontSize: '18px' }}>{darkMode ? '☀️' : '🌙'}</span>
+        </Nav.Link>
 
         {/* User Dropdown */}
         <Nav.Link>

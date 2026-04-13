@@ -38,13 +38,15 @@ const FundBoard = () => {
 
   const calculateTotalFund = (transactions) => {
     let total = 0;
-    transactions.forEach(trans => {
-      if (trans.Format === "fund") {
-        total += parseFloat(trans.amount);
-      } else if (trans.Format === "withdraw") {
-        total -= parseFloat(trans.amount);
-      }
-    });
+    transactions
+      .filter(trans => decoded && trans.sender === decoded.email)
+      .forEach(trans => {
+        if (trans.Format === "fund") {
+          total += parseFloat(trans.amount);
+        } else if (trans.Format === "withdraw") {
+          total -= parseFloat(trans.amount);
+        }
+      });
     return total;
   };
 
@@ -74,7 +76,7 @@ const FundBoard = () => {
   useEffect(() => {
     if (token && decoded) {
       fetchData();
-      const interval = setInterval(fetchData, 300);
+      const interval = setInterval(fetchData, 10000);
       return () => clearInterval(interval);
     }
   }, [token, decoded]);

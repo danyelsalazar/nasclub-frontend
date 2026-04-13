@@ -8,60 +8,32 @@ import {
   Register,
   ResetPassword,
   Portfolio,
-  Admin,
   Funds,
   Profile,
   Order,
   Users,
+  Market,
+  Position,
 } from "./pages";
-import { ToastContainer, toast } from "react-toastify";
+import { ToastContainer } from "react-toastify";
 
 const router = createBrowserRouter([
   {
     path: "/",
     element: <HomeLayout />,
     children: [
-      {
-        index: true,
-        element: <Register />,
-      },
-
-      {
-        path: "login",
-        element: <Login />,
-      },
-      {
-        path: "reset",
-        element: <ResetPassword />,
-      },
-      {
-        path: "users",
-        element: <Users />,
-      },
-      {
-        path: "register",
-        element: <Register />,
-      },
-      {
-        path: "dashboard",
-        element: <Dashboard />,
-      },
-      {
-        path: "portfolio",
-        element: <Portfolio />,
-      },
-      {
-        path: "fund",
-        element: <Funds />,
-      },
-      {
-        path: "order",
-        element: <Order />,
-      },
-      {
-        path: "profile",
-        element: <Profile />,
-      },
+      { index: true, element: <Register /> },
+      { path: "login", element: <Login /> },
+      { path: "reset", element: <ResetPassword /> },
+      { path: "users", element: <Users /> },
+      { path: "register", element: <Register /> },
+      { path: "dashboard", element: <Dashboard /> },
+      { path: "portfolio", element: <Portfolio /> },
+      { path: "fund", element: <Funds /> },
+      { path: "order", element: <Order /> },
+      { path: "profile", element: <Profile /> },
+      { path: "market", element: <Market /> },
+      { path: "position", element: <Position /> },
     ],
   },
 ]);
