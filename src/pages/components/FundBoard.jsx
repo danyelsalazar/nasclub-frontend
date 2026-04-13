@@ -165,10 +165,10 @@ const FundBoard = () => {
   };
 
   const totalAddPages = Math.ceil(
-    transaction.filter((items) => items.Format === "fund").length / 10
+    transaction.filter((items) => items.Format === "fund" && (decoded.role === "admin" || items.sender === decoded.email)).length / 10
   );
   const totalWithdrawPages = Math.ceil(
-    transaction.filter((items) => items.Format === "withdraw").length / 10
+    transaction.filter((items) => items.Format === "withdraw" && (decoded.role === "admin" || items.sender === decoded.email)).length / 10
   );
 
   return (
@@ -306,7 +306,7 @@ const FundBoard = () => {
 
                   <tbody>
                     {transaction
-                      .filter((items) => items.Format === "fund")
+                      .filter((items) => items.Format === "fund" && (decoded.role === "admin" || items.sender === decoded.email))
                       .map((item, index) => {
                         if (index > 10 * currentAddpage - 11)
                           if (index < 10 * currentAddpage)
@@ -393,7 +393,7 @@ const FundBoard = () => {
 
                   <tbody>
                     {transaction
-                      .filter((items) => items.Format === "withdraw")
+                      .filter((items) => items.Format === "withdraw" && (decoded.role === "admin" || items.sender === decoded.email))
                       .map((item, index) => {
                         if (index > 10 * currentWithdrawpage - 11)
                           if (index < 10 * currentWithdrawpage)
