@@ -1,84 +1,159 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import { jwtDecode } from "jwt-decode";
 import axios from "../../API/axios";
 import { toast } from "react-toastify";
 
+// Calcula el saldo real del usuario a partir de sus transacciones de fondo
+const calcBalance = (funds, email) => {
+  let balance = 0;
+  funds
+    .filter(f => f.sender === email)
+    .forEach(f => {
+      if (f.Format === "fund" && f.Type === "success") balance += parseFloat(f.amount);
+      if (f.Format === "withdraw" && f.Type === "success") balance -= parseFloat(f.amount);
+    });
+  return balance;
+};
+
 const Market_main = () => {
-  const tvContainer = useRef();
+  const tvChartContainer = useRef();
+  const tvTickerContainer = useRef();
+
   const [token] = useState(JSON.parse(localStorage.getItem("auth")) || "");
   const decoded = jwtDecode(token);
   axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
 
+  // ticker en formato EXCHANGE:SYMBOL
   const [ticker, setTicker] = useState("NASDAQ:AAPL");
   const [tickerInput, setTickerInput] = useState("NASDAQ:AAPL");
+
+  // precio de mercado obtenido via Yahoo Finance (proxy público)
+  const [marketPrice, setMarketPrice] = useState(null);
+  const [priceLoading, setPriceLoading] = useState(false);
+  const [priceError, setPriceError] = useState("");
+
   const [qty, setQty] = useState("");
-  const [price, setPrice] = useState("");
   const [orderType, setOrderType] = useState("B");
   const [loading, setLoading] = useState(false);
   const [userBalance, setUserBalance] = useState(0);
+  const [balanceLoading, setBalanceLoading] = useState(true);
 
-  // Fetch user balance
+  // ─── Fetch saldo del usuario ───────────────────────────────────────────────
+  const fetchBalance = useCallback(async () => {
+    try {
+      setBalanceLoading(true);
+      const res = await axios.get("/api/v1/getFund_history");
+      setUserBalance(calcBalance(res.data.fund, decoded.email));
+    } catch (e) {
+      console.error("Error fetching balance", e);
+    } finally {
+      setBalanceLoading(false);
+    }
+  }, [decoded.email]);
+
   useEffect(() => {
-    const fetchBalance = async () => {
-      try {
-        const res = await axios.get("/api/v1/getFund_history");
-        const myFunds = res.data.fund.filter(f => f.sender === decoded.email);
-        let balance = 0;
-        myFunds.forEach(f => {
-          if (f.Format === "fund" && f.Type === "success") balance += f.amount;
-          if (f.Format === "withdraw" && f.Type === "success") balance -= f.amount;
-        });
-        setUserBalance(balance);
-      } catch (e) {
-        console.error("Error fetching balance", e);
-      }
-    };
     fetchBalance();
+  }, [fetchBalance]);
+
+  // ─── Fetch precio de mercado en tiempo real via Yahoo Finance ──────────────
+  const fetchPrice = useCallback(async (symbol) => {
+    // Extraer solo el símbolo sin el exchange (ej: NASDAQ:AAPL → AAPL)
+    const sym = symbol.includes(":") ? symbol.split(":")[1] : symbol;
+    setPriceLoading(true);
+    setPriceError("");
+    setMarketPrice(null);
+    try {
+      // Usamos el proxy público de Yahoo Finance (no requiere API key)
+      const res = await fetch(
+        `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?interval=1m&range=1d`,
+        { headers: { "Content-Type": "application/json" } }
+      );
+      const data = await res.json();
+      const price = data?.chart?.result?.[0]?.meta?.regularMarketPrice;
+      if (price) {
+        setMarketPrice(parseFloat(price.toFixed(4)));
+      } else {
+        setPriceError("No se encontró precio para este ticker. Verificá el símbolo.");
+      }
+    } catch (e) {
+      setPriceError("Error al obtener el precio. Verificá tu conexión.");
+    } finally {
+      setPriceLoading(false);
+    }
   }, []);
 
-  // Load TradingView widget
   useEffect(() => {
-    if (!tvContainer.current) return;
+    fetchPrice(ticker);
+    // Actualizar precio cada 15 segundos (tiempo real)
+    const interval = setInterval(() => fetchPrice(ticker), 15000);
+    return () => clearInterval(interval);
+  }, [ticker, fetchPrice]);
 
-    // Limpiar widget anterior
-    tvContainer.current.innerHTML = "";
+  // ─── Widget gráfico TradingView ────────────────────────────────────────────
+  useEffect(() => {
+    if (!tvChartContainer.current) return;
+    tvChartContainer.current.innerHTML = "";
 
     const script = document.createElement("script");
     script.src = "https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js";
-    script.type = "text/javascript";
     script.async = true;
     script.innerHTML = JSON.stringify({
       autosize: true,
       symbol: ticker,
-      interval: "D",
+      interval: "5",
       timezone: "Etc/UTC",
       theme: document.body.classList.contains("dark-mode") ? "dark" : "light",
       style: "1",
       locale: "en",
       enable_publishing: false,
-      allow_symbol_change: true,
+      allow_symbol_change: false,
       calendar: false,
-      support_host: "https://www.tradingview.com",
     });
-
-    tvContainer.current.appendChild(script);
+    tvChartContainer.current.appendChild(script);
   }, [ticker]);
 
+  // ─── Widget ticker en tiempo real (mini quote) ─────────────────────────────
+  useEffect(() => {
+    if (!tvTickerContainer.current) return;
+    tvTickerContainer.current.innerHTML = "";
+
+    const script = document.createElement("script");
+    script.src = "https://s3.tradingview.com/external-embedding/embed-widget-single-quote.js";
+    script.async = true;
+    script.innerHTML = JSON.stringify({
+      symbol: ticker,
+      width: "100%",
+      colorTheme: document.body.classList.contains("dark-mode") ? "dark" : "light",
+      isTransparent: true,
+      locale: "en",
+    });
+    tvTickerContainer.current.appendChild(script);
+  }, [ticker]);
+
+  // ─── Búsqueda ──────────────────────────────────────────────────────────────
   const handleSearch = () => {
-    if (tickerInput.trim()) {
-      setTicker(tickerInput.trim().toUpperCase());
-    }
+    const t = tickerInput.trim().toUpperCase();
+    if (t) setTicker(t);
   };
 
-  const totalCost = qty && price ? (parseFloat(qty) * parseFloat(price)).toFixed(2) : "0.00";
+  // ─── Cálculos de orden ─────────────────────────────────────────────────────
+  const totalCost = qty && marketPrice
+    ? (parseFloat(qty) * marketPrice).toFixed(2)
+    : "0.00";
 
+  const insufficientFunds = orderType === "B" && parseFloat(totalCost) > userBalance;
+
+  // ─── Ejecutar orden ────────────────────────────────────────────────────────
   const handleSubmit = async () => {
-    if (!qty || !price || parseFloat(qty) <= 0 || parseFloat(price) <= 0) {
-      toast.error("Por favor ingresá cantidad y precio válidos");
+    if (!qty || parseFloat(qty) <= 0) {
+      toast.error("Ingresá una cantidad válida");
       return;
     }
-
-    if (orderType === "B" && parseFloat(totalCost) > userBalance) {
+    if (!marketPrice) {
+      toast.error("No hay precio de mercado disponible. Verificá el ticker.");
+      return;
+    }
+    if (insufficientFunds) {
       toast.error(`Fondos insuficientes. Tu saldo es $${userBalance.toFixed(2)}`);
       return;
     }
@@ -88,21 +163,17 @@ const Market_main = () => {
       await axios.post("/api/v1/createMarketOrder", {
         ticker: ticker.includes(":") ? ticker.split(":")[1] : ticker,
         qty: parseFloat(qty),
-        price: parseFloat(price),
+        price: marketPrice,
         type: orderType,
         sender: decoded.email,
       });
 
-      const newBalance = orderType === "B"
-        ? userBalance - parseFloat(totalCost)
-        : userBalance + parseFloat(totalCost);
-      setUserBalance(newBalance);
-
       toast.success(
-        `${orderType === "B" ? "Compra" : "Venta"} de ${qty} ${ticker} a $${price} ejecutada con éxito`
+        `${orderType === "B" ? "✅ Compra" : "🔴 Venta"} de ${qty} ${ticker.includes(":") ? ticker.split(":")[1] : ticker} a $${marketPrice} ejecutada`
       );
       setQty("");
-      setPrice("");
+      // Refetch saldo real desde el servidor
+      await fetchBalance();
     } catch (err) {
       const msg = err.response?.data?.message || "Error al procesar la orden";
       toast.error(msg);
@@ -111,54 +182,63 @@ const Market_main = () => {
     }
   };
 
+  const symbolLabel = ticker.includes(":") ? ticker.split(":")[1] : ticker;
+
   return (
     <div className="container-fluid mt-3">
-      <div className="row mb-3">
+      {/* Header */}
+      <div className="row mb-3 align-items-center">
         <div className="col">
           <h4 className="fw-bold text-primary mb-0">Market</h4>
-          <small className="text-muted">Buscá un ticker y ejecutá órdenes de compra/venta</small>
+          <small className="text-muted">Operá en tiempo real</small>
         </div>
-        <div className="col-auto align-self-center">
-          <span className="badge bg-success fs-6">
-            Saldo disponible: ${userBalance.toFixed(2)}
-          </span>
+        <div className="col-auto">
+          {balanceLoading ? (
+            <span className="badge bg-secondary fs-6">Cargando saldo...</span>
+          ) : (
+            <span className="badge bg-success fs-6">
+              💰 Saldo: ${userBalance.toFixed(2)}
+            </span>
+          )}
         </div>
       </div>
 
-      {/* Buscador de ticker */}
+      {/* Buscador */}
       <div className="card shadow-sm mb-3">
         <div className="card-body py-2">
-          <div className="d-flex gap-2 align-items-center">
+          <div className="d-flex gap-2 align-items-center flex-wrap">
             <input
               type="text"
               className="form-control"
               placeholder="Ej: NASDAQ:AAPL, NYSE:TSLA, BINANCE:BTCUSDT"
               value={tickerInput}
-              onChange={(e) => setTickerInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-              style={{ maxWidth: "400px" }}
+              onChange={e => setTickerInput(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && handleSearch()}
+              style={{ maxWidth: "380px" }}
             />
             <button className="btn btn-primary" onClick={handleSearch}>
-              Ver Gráfico
+              Buscar
             </button>
             <span className="text-muted small">
               Ticker actual: <strong>{ticker}</strong>
             </span>
           </div>
-          <small className="text-muted">
-            Formato: EXCHANGE:TICKER — ej: NASDAQ:AAPL, NYSE:MSFT, BINANCE:BTCUSDT, FX:EURUSD
+          <small className="text-muted d-block mt-1">
+            Formato: EXCHANGE:TICKER — ej: <code>NASDAQ:AAPL</code>, <code>NYSE:MSFT</code>, <code>BINANCE:BTCUSDT</code>, <code>FX:EURUSD</code>
           </small>
         </div>
       </div>
 
+      {/* Mini quote widget TradingView */}
+      <div className="mb-2" ref={tvTickerContainer} style={{ height: "60px" }} />
+
       <div className="row">
-        {/* Gráfico TradingView */}
+        {/* Gráfico */}
         <div className="col-md-8">
           <div className="card shadow-sm">
-            <div className="card-body p-0" style={{ height: "500px" }}>
+            <div className="card-body p-0" style={{ height: "480px" }}>
               <div
-                className="tradingview-widget-container"
-                ref={tvContainer}
+                ref={tvChartContainer}
                 style={{ height: "100%", width: "100%" }}
               />
             </div>
@@ -167,13 +247,37 @@ const Market_main = () => {
 
         {/* Panel de orden */}
         <div className="col-md-4">
-          <div className="card shadow-sm h-100">
+          <div className="card shadow-sm">
             <div className="card-header bg-primary text-white">
               <h5 className="mb-0">Ejecutar Orden</h5>
-              <small>{ticker}</small>
+              <small className="opacity-75">{ticker}</small>
             </div>
             <div className="card-body">
-              {/* Buy / Sell toggle */}
+
+              {/* Precio en tiempo real */}
+              <div className="alert alert-info py-2 mb-3 text-center">
+                {priceLoading ? (
+                  <><span className="spinner-border spinner-border-sm me-2" />Obteniendo precio...</>
+                ) : priceError ? (
+                  <span className="text-danger small">{priceError}</span>
+                ) : marketPrice ? (
+                  <>
+                    <strong className="fs-5">${marketPrice.toLocaleString()}</strong>
+                    <span className="text-muted ms-2 small">precio de mercado</span>
+                    <button
+                      className="btn btn-sm btn-outline-secondary ms-2 py-0"
+                      onClick={() => fetchPrice(ticker)}
+                      title="Actualizar precio"
+                    >
+                      ↻
+                    </button>
+                  </>
+                ) : (
+                  <span className="text-muted small">Sin precio</span>
+                )}
+              </div>
+
+              {/* Buy / Sell */}
               <div className="btn-group w-100 mb-3" role="group">
                 <button
                   type="button"
@@ -191,80 +295,66 @@ const Market_main = () => {
                 </button>
               </div>
 
+              {/* Cantidad */}
               <div className="mb-3">
-                <label className="form-label fw-semibold">Cantidad</label>
+                <label className="form-label fw-semibold">Cantidad de {symbolLabel}</label>
                 <input
                   type="number"
                   className="form-control"
                   placeholder="Ej: 10"
-                  min="0"
-                  step="1"
+                  min="0.0001"
+                  step="any"
                   value={qty}
-                  onChange={(e) => setQty(e.target.value)}
+                  onChange={e => setQty(e.target.value)}
                 />
               </div>
 
-              <div className="mb-3">
-                <label className="form-label fw-semibold">Precio por unidad ($)</label>
-                <div className="input-group">
-                  <span className="input-group-text">$</span>
-                  <input
-                    type="number"
-                    className="form-control"
-                    placeholder="Ej: 150.00"
-                    min="0"
-                    step="0.01"
-                    value={price}
-                    onChange={(e) => setPrice(e.target.value)}
-                  />
+              {/* Resumen */}
+              <div className={`alert py-2 mb-3 ${insufficientFunds ? "alert-danger" : "alert-light border"}`}>
+                <div className="d-flex justify-content-between">
+                  <span className="text-muted">Precio unitario:</span>
+                  <strong>{marketPrice ? `$${marketPrice.toLocaleString()}` : "—"}</strong>
                 </div>
-              </div>
-
-              <div className="alert alert-light border mb-3">
                 <div className="d-flex justify-content-between">
                   <span className="text-muted">Total de la orden:</span>
                   <strong>${totalCost}</strong>
                 </div>
+                <hr className="my-1" />
                 <div className="d-flex justify-content-between">
                   <span className="text-muted">Tu saldo:</span>
-                  <span className={userBalance < parseFloat(totalCost) && orderType === "B" ? "text-danger" : "text-success"}>
+                  <span className={insufficientFunds ? "text-danger fw-bold" : "text-success"}>
                     ${userBalance.toFixed(2)}
                   </span>
                 </div>
-                {orderType === "B" && (
+                {orderType === "B" && qty && marketPrice && (
                   <div className="d-flex justify-content-between">
                     <span className="text-muted">Saldo post-orden:</span>
-                    <span className={userBalance - parseFloat(totalCost) < 0 ? "text-danger" : "text-success"}>
-                      ${(userBalance - parseFloat(totalCost || 0)).toFixed(2)}
+                    <span className={userBalance - parseFloat(totalCost) < 0 ? "text-danger fw-bold" : "text-success"}>
+                      ${(userBalance - parseFloat(totalCost)).toFixed(2)}
                     </span>
                   </div>
                 )}
+                {insufficientFunds && (
+                  <div className="mt-1 small text-danger fw-bold">⚠ Fondos insuficientes</div>
+                )}
               </div>
 
-              {orderType === "B" && parseFloat(totalCost) > userBalance && (
-                <div className="alert alert-danger py-2 small">
-                  Fondos insuficientes para esta orden
-                </div>
-              )}
-
               <button
-                className={`btn w-100 ${orderType === "B" ? "btn-success" : "btn-danger"}`}
+                className={`btn w-100 fw-bold ${orderType === "B" ? "btn-success" : "btn-danger"}`}
                 onClick={handleSubmit}
-                disabled={loading || (orderType === "B" && parseFloat(totalCost) > userBalance)}
+                disabled={loading || !marketPrice || (orderType === "B" && insufficientFunds)}
               >
                 {loading ? (
-                  <>
-                    <span className="spinner-border spinner-border-sm me-2" />
-                    Procesando...
-                  </>
+                  <><span className="spinner-border spinner-border-sm me-2" />Procesando...</>
                 ) : (
-                  `${orderType === "B" ? "Comprar" : "Vender"} ${ticker.includes(":") ? ticker.split(":")[1] : ticker}`
+                  `${orderType === "B" ? "Comprar" : "Vender"} ${symbolLabel}`
                 )}
               </button>
 
               <hr />
-              <small className="text-muted">
-                Toda operación se registra en <strong>Position</strong> y <strong>Orders</strong> automáticamente.
+              <small className="text-muted d-block text-center">
+                Precio se actualiza cada 15 segundos.<br />
+                La operación se refleja en <strong>Position</strong> y <strong>Orders</strong>.
               </small>
             </div>
           </div>
