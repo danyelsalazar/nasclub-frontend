@@ -229,7 +229,7 @@ const Market_main = () => {
     <div
       ref={tvTickerContainer}
       style={{
-        height: "60px",
+        height: "95px",
         width: "100%",
         overflow: "hidden",
       }}
