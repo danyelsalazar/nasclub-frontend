@@ -123,7 +123,8 @@ body.dark-mode .position-absolute.border.rounded.shadow.bg-light {
   background-color: #16213e !important;
 }
 
-.bloque-mercado-vista{
-  margin-bottom: 80px;
-  background-color: aqua;
+.contenedor-padre-mercado-grafico{
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
 }

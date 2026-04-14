@@ -178,7 +178,7 @@ const Market_main = () => {
   const symbolLabel = ticker.includes(":") ? ticker.split(":")[1] : ticker;
 
   return (
-    <div className="container-fluid mt-3" >
+    <div className="container-fluid mt-3 contenedor-padre-mercado-grafico" >
       {/* Header */}
       <div className="row mb-3 align-items-center">
         <div className="col">
