@@ -178,7 +178,7 @@ const Market_main = () => {
   const symbolLabel = ticker.includes(":") ? ticker.split(":")[1] : ticker;
 
   return (
-    <div className="container-fluid mt-3">
+    <div className="container-fluid mt-3" >
       {/* Header */}
       <div className="row mb-3 align-items-center">
         <div className="col">
@@ -223,7 +223,7 @@ const Market_main = () => {
       </div>
 
       {/* Mini quote widget TradingView */}
-      <div className="mb-2" ref={tvTickerContainer} style={{ height: "60px" }} />
+      <div className="mb-2 bloque-mercado-vista" ref={tvTickerContainer} style={{ height: "60px" }} />
 
       <div className="row">
         {/* Gráfico */}

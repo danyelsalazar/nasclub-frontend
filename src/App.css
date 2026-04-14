@@ -122,3 +122,7 @@ body.dark-mode .border {
 body.dark-mode .position-absolute.border.rounded.shadow.bg-light {
   background-color: #16213e !important;
 }
+
+.bloque-mercado-vista{
+  margin-bottom: 80px;
+}
