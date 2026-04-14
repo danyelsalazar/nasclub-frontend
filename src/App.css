@@ -122,9 +122,3 @@ body.dark-mode .border {
 body.dark-mode .position-absolute.border.rounded.shadow.bg-light {
   background-color: #16213e !important;
 }
-
-.contenedor-padre-mercado-grafico{
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
-}
