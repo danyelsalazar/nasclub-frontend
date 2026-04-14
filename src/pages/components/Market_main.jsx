@@ -223,13 +223,19 @@ const Market_main = () => {
       </div>
 
       {/* Mini quote widget TradingView */}
-      <div className="mb-2 bloque-mercado-vista" ref={tvTickerContainer} style={{
-    height: "60px",
-    width: "100%",
-    overflow: "hidden",
-    position: "relative",
-    zIndex: 1,
-  }} />
+      
+      <div className="card shadow-sm mb-3">
+  <div className="card-body p-2">
+    <div
+      ref={tvTickerContainer}
+      style={{
+        height: "60px",
+        width: "100%",
+        overflow: "hidden",
+      }}
+    />
+  </div>
+</div>
 
       <div className="row">
         {/* Gráfico */}
