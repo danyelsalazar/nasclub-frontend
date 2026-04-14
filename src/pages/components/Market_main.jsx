@@ -29,6 +29,7 @@ const Market_main = () => {
 
   // precio de mercado obtenido via Yahoo Finance (proxy público)
   const [marketPrice, setMarketPrice] = useState(null);
+  const [priceChange, setPriceChange] = useState({ change: 0, changePct: 0 });
   const [priceLoading, setPriceLoading] = useState(false);
   const [priceError, setPriceError] = useState("");
 
@@ -55,28 +56,20 @@ const Market_main = () => {
     fetchBalance();
   }, [fetchBalance]);
 
-  // ─── Fetch precio de mercado en tiempo real via Yahoo Finance ──────────────
+  // ─── Fetch precio via backend (evita CORS) ────────────────────────────────
   const fetchPrice = useCallback(async (symbol) => {
-    // Extraer solo el símbolo sin el exchange (ej: NASDAQ:AAPL → AAPL)
     const sym = symbol.includes(":") ? symbol.split(":")[1] : symbol;
     setPriceLoading(true);
     setPriceError("");
     setMarketPrice(null);
     try {
-      // Usamos el proxy público de Yahoo Finance (no requiere API key)
-      const res = await fetch(
-        `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?interval=1m&range=1d`,
-        { headers: { "Content-Type": "application/json" } }
-      );
-      const data = await res.json();
-      const price = data?.chart?.result?.[0]?.meta?.regularMarketPrice;
-      if (price) {
-        setMarketPrice(parseFloat(price.toFixed(4)));
-      } else {
-        setPriceError("No se encontró precio para este ticker. Verificá el símbolo.");
-      }
+      const res = await axios.get(`/api/v1/getMarketPrice/${sym}`);
+      const { price, change, changePct } = res.data;
+      setMarketPrice(price);
+      setPriceChange({ change, changePct });
     } catch (e) {
-      setPriceError("Error al obtener el precio. Verificá tu conexión.");
+      const msg = e.response?.data?.message || "Ticker no encontrado. Verificá el símbolo.";
+      setPriceError(msg);
     } finally {
       setPriceLoading(false);
     }
@@ -263,7 +256,9 @@ const Market_main = () => {
                 ) : marketPrice ? (
                   <>
                     <strong className="fs-5">${marketPrice.toLocaleString()}</strong>
-                    <span className="text-muted ms-2 small">precio de mercado</span>
+                    <span className={"ms-2 small fw-bold " + (priceChange.change >= 0 ? "text-success" : "text-danger")}>
+                      {priceChange.change >= 0 ? "+" : ""}{priceChange.change} ({priceChange.changePct}%)
+                    </span>
                     <button
                       className="btn btn-sm btn-outline-secondary ms-2 py-0"
                       onClick={() => fetchPrice(ticker)}
